@@ -1,0 +1,5 @@
+package cursor
+
+Cursor :: struct{
+      
+}

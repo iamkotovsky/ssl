@@ -1,0 +1,8 @@
+class Point {
+    function __init(self, x, y) {
+        self.x = x
+        self.y = y
+    }
+}
+
+var new = Point(1, 2)
