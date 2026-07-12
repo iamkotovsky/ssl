@@ -1,21 +1,24 @@
 package ssl
 
-import "core:os"
+import asm_parser "asm/parser"
+import "asm/module"
 import "core:fmt"
-import vc "vm/core"
-import val "vm/value"
+import "core:os"
 
 main :: proc() {
-	out := os.stream_from_handle(os.stdout)
+	source, ok := os.read_entire_file("source.ssa")
+	if !ok {
+		fmt.println("failed to read source.ssa")
+		return
+	}
+	defer delete(source)
 
-	vm := vc.new_vm()
-	defer vc.destroy_vm(vm)
+	m, err := asm_parser.parse(string(source))
+	if err.kind != .None {
+		asm_parser.print_error(err)
+		return
+	}
+	defer module.destroy(m)
 
-	cls := vc.new_class(vm, "string")
-	val.repr(cls, out)
-	fmt.println()
-
-	s := vc.class_instance(cls)
-	val.repr(s, out)
-	fmt.println()
+	module.debug_print(m)
 }
