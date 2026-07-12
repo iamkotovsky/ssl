@@ -1,8 +1,6 @@
-package inst
+package bytecode
 
-import "operand"
-
-Kind :: enum {
+Opcode :: enum {
 	None,
 	Load,
 	Load_Local,
@@ -16,13 +14,13 @@ Kind :: enum {
 	Make_F64,
 	Make_String,
 	Make_Class,
-	Make_Func,
+	Make_Function,
 	Make_List,
 	Call,
-	Ret,
+	Return,
 	Jump,
-	Field_Get,
-	Field_Set,
+	Get_Field,
+	Set_Field,
 	Add,
 	Sub,
 	Mul,
@@ -32,7 +30,7 @@ Kind :: enum {
 
 @(private)
 @(rodata)
-INSTS := [Kind]string {
+_OPCODE_NAMES := [Opcode]string {
 	.None        = "none",
 	.Load        = "load",
 	.Load_Local  = "load.local",
@@ -46,13 +44,13 @@ INSTS := [Kind]string {
 	.Make_F64    = "make.f64",
 	.Make_String = "make.string",
 	.Make_Class  = "make.class",
-	.Make_Func   = "make.func",
+	.Make_Function = "make.func",
 	.Make_List   = "make.list",
 	.Call        = "call",
-	.Ret         = "ret",
+	.Return      = "ret",
 	.Jump        = "jump",
-	.Field_Get   = "field.get",
-	.Field_Set   = "field.set",
+	.Get_Field   = "field.get",
+	.Set_Field   = "field.set",
 	.Add         = "add",
 	.Sub         = "sub",
 	.Mul         = "mul",
@@ -62,7 +60,7 @@ INSTS := [Kind]string {
 
 @(private)
 @(rodata)
-OPERAND_KIND := #partial [Kind]operand.Kind {
+_OPCODE_OPERANDS := #partial [Opcode]Operand_Kind {
 	.Load        = .I64,
 	.Load_Local  = .I64,
 	.Store       = .I64,
@@ -73,42 +71,33 @@ OPERAND_KIND := #partial [Kind]operand.Kind {
 	.Make_I64    = .I64,
 	.Make_F32    = .F32,
 	.Make_F64    = .F64,
-	.Make_String = .Const,
-	.Make_Class  = .Const,
-	.Make_Func   = .Label,
+	.Make_String = .Constant,
+	.Make_Class  = .Constant,
+	.Make_Function = .Label,
 	.Make_List   = .I64,
 	.Call        = .I64,
 	.Jump        = .Label,
-	.Field_Get   = .Const,
-	.Field_Set   = .Const,
+	.Get_Field   = .Constant,
+	.Set_Field   = .Constant,
 }
 
-Inst :: struct {
-	kind:  Kind,
-	value: operand.Operand,
+Instruction :: struct {
+	opcode:  Opcode,
+	operand: Operand,
 }
 
-from_string :: proc(ident: string) -> (Kind, bool) {
-	for mnemonic, kind in INSTS {
-		if mnemonic == ident {
-			return kind, true
-		}
-	}
-	return .None, false
+opcode_name :: proc(opcode: Opcode) -> string {
+	return _OPCODE_NAMES[opcode]
 }
 
-to_string :: proc(kind: Kind) -> string {
-	return INSTS[kind]
+opcode_has_operand :: proc(opcode: Opcode) -> bool {
+	return opcode_operand(opcode) != .None
 }
 
-has_operand :: proc(kind: Kind) -> bool {
-	return expected_operand(kind) != .None
+opcode_operand :: proc(opcode: Opcode) -> Operand_Kind {
+	return _OPCODE_OPERANDS[opcode]
 }
 
-expected_operand :: proc(kind: Kind) -> operand.Kind {
-	return OPERAND_KIND[kind]
-}
-
-make :: proc(kind: Kind = .None, value: operand.Operand = {}) -> Inst {
-	return {kind, value}
+make_instruction :: proc(opcode: Opcode = .None, operand: Operand = {}) -> Instruction {
+	return {opcode, operand}
 }

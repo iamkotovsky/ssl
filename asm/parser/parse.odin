@@ -1,9 +1,9 @@
 package parser
 
-import "../module"
+import "../../bytecode"
 import "ast"
 
-parse :: proc(source: string) -> (module.Module, Error) {
+parse :: proc(source: string) -> (bytecode.Module, Error) {
 	p: Parser
 	init(&p, source)
 	parsed, err := _parse(&p)

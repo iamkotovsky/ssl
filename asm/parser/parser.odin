@@ -1,7 +1,7 @@
 package parser
 
 import "../lexer"
-import "../module/inst"
+import "../../bytecode"
 import "ast"
 
 import "core:strconv"
@@ -34,30 +34,30 @@ _parse :: proc(p: ^Parser) -> (ast.Module, Error) {
 		if it.kind == .Line {
 			continue
 		} else if it.kind == .Inst {
-			kind, exists := inst.from_string(it.value)
+			opcode, exists := _opcode_from_string(it.value)
 			if !exists {
 				return parsed, _error_at(.Unknown_Inst, it)
 			}
 
 			parsed_inst: ast.Inst
-			parsed_inst.kind = kind
+			parsed_inst.opcode = opcode
 
 			it = _next(p)
 			if it.kind == .EOF {
-				if inst.has_operand(kind) {
+				if bytecode.opcode_has_operand(opcode) {
 					return parsed, _error_at(.Missing_Operand, it)
 				}
 				append(&parsed.insts, parsed_inst)
 				return parsed, _error(.None)
 			}
 			if it.kind == .Line {
-				if inst.has_operand(kind) {
+				if bytecode.opcode_has_operand(opcode) {
 					return parsed, _error_at(.Missing_Operand, it)
 				}
 				append(&parsed.insts, parsed_inst)
 				continue
 			}
-			if !inst.has_operand(kind) {
+			if !bytecode.opcode_has_operand(opcode) {
 				return parsed, _error_at(.Unexpected_Operand, it)
 			}
 
@@ -104,11 +104,21 @@ _parse :: proc(p: ^Parser) -> (ast.Module, Error) {
 			}
 
 			parsed.labels[it.value] = len(parsed.insts)
-			append(&parsed.debug_labels, ast.Debug_Label{name = it.value, inst = len(parsed.insts)})
+			append(&parsed.debug_labels, ast.Debug_Label{name = it.value, instruction = len(parsed.insts)})
 			continue
 		} else {
 			return parsed, _error_at(.Expected_Inst_Or_Label, it)
 		}
 	}
 	return parsed, _error(.None)
+}
+
+@(private)
+_opcode_from_string :: proc(value: string) -> (bytecode.Opcode, bool) {
+	for opcode in bytecode.Opcode {
+		if bytecode.opcode_name(opcode) == value {
+			return opcode, true
+		}
+	}
+	return .None, false
 }

@@ -1,7 +1,7 @@
 package ast
 
 import "../../lexer"
-import "../../module/inst"
+import "../../../bytecode"
 
 Module :: struct {
 	labels:       map[string]int,
@@ -55,11 +55,11 @@ make_string :: proc(value: string, token: lexer.Token) -> Operand {
 }
 
 Inst :: struct {
-	kind:    inst.Kind,
+	opcode:  bytecode.Opcode,
 	operand: Operand,
 }
 
 Debug_Label :: struct {
-	name: string,
-	inst: int,
+	name:        string,
+	instruction: int,
 }

@@ -5,7 +5,7 @@
     ret
 
 .Point.__init
-    load.local "some"
+    load.local 1
     load.local 0
     field.set  "x"
     load.local 2
