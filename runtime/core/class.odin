@@ -1,5 +1,15 @@
 package core
 
+new_type :: proc(stdi: ^Interface) -> ^Class {
+	self := new(Class)
+	_init_object(self)
+	self.destroy = _class_destroy
+	self.call = _class_call
+	self.class = self
+	self.name = "type"
+	return self
+}
+
 Class :: struct {
 	using _:       Object,
 	name:          string,
@@ -8,7 +18,7 @@ Class :: struct {
 }
 
 new_class :: proc(stdi: ^Interface, name: string, parent: ^Class = nil) -> ^Class {
-	self := cast(^Class) alloc(stdi, stdi.object, new(Class))
+	self := cast(^Class) alloc(stdi, stdi.type, new(Class))
 	self.destroy = auto_cast _class_destroy
 
 	self.name = name
@@ -34,7 +44,7 @@ alloc :: proc(stdi: ^Interface, self: ^Class, instance: ^Object = nil) -> ^Objec
 		instance.fields[k] = v
 	}
 	for k, v in self.proto_methods {
-		instance.methods[k] = v
+		instance.fields[k] = new_method(stdi, instance, v)
 	}
 	instance.class = self
 	instance.fields["__class"] = self
@@ -47,10 +57,10 @@ alloc :: proc(stdi: ^Interface, self: ^Class, instance: ^Object = nil) -> ^Objec
 }
 
 @(private)
-_class_call :: proc(self: ^Class) {
-	_object_destroy(self)
-	delete(self.proto_fields)
-	delete(self.proto_methods)
+_class_call :: proc(stdi: ^Interface, self: ^Class, args: int) {
+	instance := alloc(stdi, self)
+	init(stdi, instance, args)
+	stdi.slot = instance
 }
 
 @(private)

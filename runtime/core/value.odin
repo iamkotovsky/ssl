@@ -1,16 +1,10 @@
 package core
 
 import "core:fmt"
-import "core:io"
-
-// Get_Proc :: proc(stdi: ^Interface, self: ^Value, key: string) -> ^Value
-// Set_Proc :: proc(stdi: ^Interface, self: ^Value, key: string, value: ^Value)
-// Call_Proc :: proc(stdi: ^Interface, self: ^Value, args: int) -> ^Value
-// Mark_Proc :: proc(stdi: ^Interface, self: ^Value)
-// Destroy_Proc :: proc(stdi: ^Interface, self: ^Value)
-// Repr_Proc :: proc(stdi: ^Interface, self: ^Value, w: io.Stream)
 
 Value :: struct {
+	call:    proc(stdi: ^Interface, self: ^Value, args: []^Value) -> ^Value,
+	
 	mark:    proc(self: ^Value),
 	destroy: proc(self: ^Value),
 	
@@ -49,3 +43,4 @@ destroy :: proc(self: ^Value) {
 	}
 	free(self)
 }
+
