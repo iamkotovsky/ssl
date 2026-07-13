@@ -66,17 +66,17 @@ _OPCODE_OPERANDS := #partial [Opcode]Operand_Kind {
 	.Store       = .I64,
 	.Store_Local = .I64,
 	.Make_I8     = .I8,
-	.Make_I16    = .I32,
+	.Make_I16    = .I16,
 	.Make_I32    = .I32,
 	.Make_I64    = .I64,
 	.Make_F32    = .F32,
 	.Make_F64    = .F64,
 	.Make_String = .Constant,
 	.Make_Class  = .Constant,
-	.Make_Function = .Label,
+	.Make_Function = .Target,
 	.Make_List   = .I64,
 	.Call        = .I64,
-	.Jump        = .Label,
+	.Jump        = .Target,
 	.Get_Field   = .Constant,
 	.Set_Field   = .Constant,
 }
@@ -98,6 +98,7 @@ opcode_operand :: proc(opcode: Opcode) -> Operand_Kind {
 	return _OPCODE_OPERANDS[opcode]
 }
 
-make_instruction :: proc(opcode: Opcode = .None, operand: Operand = {}) -> Instruction {
+@(private)
+_make_instruction :: proc(opcode: Opcode = .None, operand: Operand = {}) -> Instruction {
 	return {opcode, operand}
 }

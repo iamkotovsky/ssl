@@ -2,7 +2,7 @@ package bytecode
 
 import "core:fmt"
 
-debug_print :: proc(m: Module) {
+print :: proc(m: Module) {
 	fmt.println("bytecode module")
 	fmt.printfln("  constants: %d", len(m.constants))
 	if len(m.constants) == 0 {
@@ -34,14 +34,10 @@ debug_print :: proc(m: Module) {
 @(private)
 _debug_print_labels :: proc(m: Module, inst_index: int) {
 	for label in m.debug.labels {
-		if label.instruction != inst_index {
+		if int(label.instruction) != inst_index {
 			continue
 		}
-		if label.name_constant >= 0 && label.name_constant < len(m.constants) && m.constants[label.name_constant].kind == .String {
-			fmt.printfln("    %s", m.constants[label.name_constant].as_string)
-		} else {
-			fmt.printfln("    <debug-label #%d>", label.name_constant)
-		}
+		fmt.printfln("    %s", label.name)
 	}
 }
 
@@ -56,17 +52,19 @@ _debug_print_operand :: proc(m: Module, instruction: Instruction) {
 		fmt.printf(" %d", instruction.operand.as_i32)
 	case .I8:
 		fmt.printf(" %d", instruction.operand.as_i8)
+	case .I16:
+		fmt.printf(" %d", instruction.operand.as_i16)
 	case .F64:
 		fmt.printf(" %g", instruction.operand.as_f64)
 	case .F32:
 		fmt.printf(" %g", instruction.operand.as_f32)
-	case .Label:
-		fmt.printf(" @%d", instruction.operand.as_label)
-		if name, ok := _debug_label_name(m, instruction.operand.as_label); ok {
+	case .Target:
+		fmt.printf(" @%d", instruction.operand.as_target)
+		if name, ok := _debug_label_name(m, int(instruction.operand.as_target)); ok {
 			fmt.printf(" %s", name)
 		}
 	case .Constant:
-		i := instruction.operand.as_constant
+		i := int(instruction.operand.as_constant)
 		if i >= 0 && i < len(m.constants) && m.constants[i].kind == .String {
 			fmt.printf(" #%d %q", i, m.constants[i].as_string)
 		} else {
@@ -78,12 +76,10 @@ _debug_print_operand :: proc(m: Module, instruction: Instruction) {
 @(private)
 _debug_label_name :: proc(m: Module, inst_index: int) -> (string, bool) {
 	for label in m.debug.labels {
-		if label.instruction != inst_index {
+		if int(label.instruction) != inst_index {
 			continue
 		}
-		if label.name_constant >= 0 && label.name_constant < len(m.constants) && m.constants[label.name_constant].kind == .String {
-			return m.constants[label.name_constant].as_string, true
-		}
+		return label.name, true
 	}
 	return "", false
 }

@@ -1,24 +1,25 @@
 package ssl
 
-import as "asm/parser"
+import "assembler"
 import "bytecode"
 import "core:fmt"
 import "core:os"
 
 main :: proc() {
-	source, rerr := os.read_entire_file("source.ssa", context.allocator)
-	if rerr != nil {
-		fmt.println("failed to read source.ssa")
+	file_name := "source.sa"
+	source, read_error := os.read_entire_file(file_name, context.allocator)
+	if read_error != nil {
+		fmt.printfln("failed to read %s", file_name)
 		return
 	}
 	defer delete(source)
 
-	m, perr := as.parse(string(source))
-	if perr.kind != .None {
-		as.print_error(perr)
+	m, parse_error := assembler.parse(string(source))
+	if parse_error.kind != .None {
+		assembler.print_error(parse_error, file_name)
 		return
 	}
 	defer bytecode.destroy(m)
 
-	bytecode.debug_print(m)
+	bytecode.print(m)
 }

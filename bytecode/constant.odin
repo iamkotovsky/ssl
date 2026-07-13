@@ -13,16 +13,14 @@ Constant :: struct {
 	},
 }
 
-make_constant :: proc {
-	make_string_constant,
-}
-
-destroy_constant :: proc(constant: Constant) {
+@(private)
+_destroy_constant :: proc(constant: Constant) {
 	if constant.kind == .String {
 		delete(constant.as_string)
 	}
 }
 
-make_string_constant :: proc(value: string) -> Constant {
+@(private)
+_make_string_constant :: proc(value: string) -> Constant {
 	return {kind = .String, as_string = strings.clone(value)}
 }

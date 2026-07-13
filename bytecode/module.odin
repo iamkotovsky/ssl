@@ -5,8 +5,8 @@ Debug_Info :: struct {
 }
 
 Debug_Label :: struct {
-	name_constant: int,
-	instruction:   int,
+	name:        string,
+	instruction: Instruction_Index,
 }
 
 Module :: struct {
@@ -17,9 +17,12 @@ Module :: struct {
 
 destroy :: proc(m: Module) {
 	for constant in m.constants {
-		destroy_constant(constant)
+		_destroy_constant(constant)
 	}
 	delete(m.constants)
 	delete(m.instructions)
+	for label in m.debug.labels {
+		delete(label.name)
+	}
 	delete(m.debug.labels)
 }
