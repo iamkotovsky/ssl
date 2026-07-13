@@ -20,10 +20,8 @@ add_module :: proc(
 	store: ^Module_Store,
 	name: string,
 	definition: bytecode.Module,
-	global_count: int = 0,
 ) -> (^Module_Instance, Module_Store_Error) {
 	assert(store != nil)
-	assert(global_count >= 0)
 	if _, exists := store.modules[name]; exists {
 		return nil, Duplicate_Module_Error{name}
 	}
@@ -31,8 +29,7 @@ add_module :: proc(
 	module := new(Module_Instance)
 	module.name = strings.clone(name)
 	module.definition = definition
-	module.constants = make([]core.Value, len(definition.constants))
-	module.globals = make([]core.Value, global_count)
+	module.globals = make(map[string]core.Value)
 	module.state = .Loaded
 	store.modules[module.name] = module
 	return module, nil

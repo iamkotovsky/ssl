@@ -35,10 +35,9 @@ finish :: proc(b: ^Builder) -> (Module, Builder_Error) {
 		if !label.bound {
 			return {}, Unbound_Label_Error{fixup.instruction, fixup.target}
 		}
-		assert(
-			int(label.instruction) < len(b.instructions),
-			"bound bytecode label points outside instruction storage",
-		)
+		if int(label.instruction) >= len(b.instructions) {
+			return {}, Label_Target_Out_Of_Range_Error{label.instruction, fixup.target}
+		}
 		b.instructions[int(fixup.instruction)].operand = _make_target_operand(label.instruction)
 	}
 
@@ -75,17 +74,17 @@ finish :: proc(b: ^Builder) -> (Module, Builder_Error) {
 		if !label.bound {
 			return {}, Unbound_Label_Error{label = Label(i + 1)}
 		}
+		if int(label.instruction) >= len(b.instructions) {
+			return {}, Label_Target_Out_Of_Range_Error{
+				instruction = label.instruction,
+				label       = Label(i + 1),
+			}
+		}
 		append(
 			&b.debug_labels,
 			Debug_Label{name = label.name, instruction = label.instruction},
 		)
 		label.name = ""
-	}
-	for label in b.debug_labels {
-		assert(
-			int(label.instruction) < len(b.instructions),
-			"generated debug label points outside instruction storage",
-		)
 	}
 
 	delete(b.labels)

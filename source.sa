@@ -1,33 +1,52 @@
-.start
+export Point
+
+global std.fmt
+global Point
+
+function __init
+    load.module "std.fmt"
+    store.global std.fmt
+ 
     make.class "Point"
+    store.global Point
+
+    load.global Point.__init
+    load.global Point
+    get.field "define..."
+    call
+    return
+    
+function __start
+    make.i32 1
+    make.i32 2
+    load.global Point
+    call
+    get.field "__repr"
+    call
+    load.global std.fmt
+    get.field "print"
+    call
+    return
+
+function make_counter { locals=1 }
+    make.i32 12
     store.local 0
-    
-    make.func .Point.__init
-    make.string "__init"
-    load.local 0
-    field.get "__set_method"
-    call 2
+    make.func .anonym1
+    return
 
-    make.i8  21
-    make.i32 42
-    load.local 0
-    call 2
-    halt
-
-.test
-    load.local 0
-    load.local 1
+function .anonym1 { capture=0 }
+    load.capture 0
+    make.i32 0
     add
-    ret
-
-.Point.__init
-    load.local 1
-    load.local 0
-    field.set  "x"
-    load.local 2
-    load.local 0
-    field.set  "y"
-    field.get  "y"
-    ret
+    store.capture 0
+    return
     
+function Point.__init { artity=3 }
+    load.local 0
+    load.local 1
+    set.field "x"
+    load.local 0
+    load.local 2
+    set.field "y"
+    return
     

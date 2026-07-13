@@ -2,9 +2,9 @@ package bytecode
 
 Opcode :: enum {
 	None,
-	Load,
+	Load_Global,
 	Load_Local,
-	Store,
+	Store_Global,
 	Store_Local,
 	Make_I8,
 	Make_I16,
@@ -32,10 +32,10 @@ Opcode :: enum {
 @(rodata)
 _OPCODE_NAMES := [Opcode]string {
 	.None        = "none",
-	.Load        = "load",
-	.Load_Local  = "load.local",
-	.Store       = "store",
-	.Store_Local = "store.local",
+	.Load_Global  = "load.global",
+	.Load_Local   = "load.local",
+	.Store_Global = "store.global",
+	.Store_Local  = "store.local",
 	.Make_I8     = "make.i8",
 	.Make_I16    = "make.i16",
 	.Make_I32    = "make.i32",
@@ -61,10 +61,10 @@ _OPCODE_NAMES := [Opcode]string {
 @(private)
 @(rodata)
 _OPCODE_OPERANDS := #partial [Opcode]Operand_Kind {
-	.Load        = .I64,
-	.Load_Local  = .I64,
-	.Store       = .I64,
-	.Store_Local = .I64,
+	.Load_Global  = .Constant,
+	.Load_Local   = .I64,
+	.Store_Global = .Constant,
+	.Store_Local  = .I64,
 	.Make_I8     = .I8,
 	.Make_I16    = .I16,
 	.Make_I32    = .I32,

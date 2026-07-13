@@ -27,6 +27,11 @@ Unbound_Label_Error :: struct {
 	label:       Label,
 }
 
+Label_Target_Out_Of_Range_Error :: struct {
+	instruction: Instruction_Index,
+	label:       Label,
+}
+
 Invalid_Target_Opcode_Error :: struct {
 	instruction: Instruction_Index,
 	opcode:      Opcode,
@@ -39,5 +44,6 @@ Builder_Error :: union {
 	Invalid_Label_Error,
 	Label_Already_Bound_Error,
 	Unbound_Label_Error,
+	Label_Target_Out_Of_Range_Error,
 	Invalid_Target_Opcode_Error,
 }
