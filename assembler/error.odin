@@ -1,6 +1,5 @@
 package assembler
 
-import "../bytecode"
 import "core:fmt"
 
 Error_Kind :: enum {
@@ -21,10 +20,9 @@ Error_Kind :: enum {
 }
 
 Error :: struct {
-	kind:        Error_Kind,
-	line:        int,
-	col:         int,
-	build_error: bytecode.Builder_Error,
+	kind: Error_Kind,
+	line: int,
+	col:  int,
 }
 
 @(private)
@@ -35,16 +33,6 @@ _error :: proc(kind: Error_Kind) -> Error {
 @(private)
 _error_at :: proc(kind: Error_Kind, token: _Token) -> Error {
 	return {kind = kind, line = token.line, col = token.col}
-}
-
-@(private)
-_build_error_at :: proc(err: bytecode.Builder_Error, token: _Token = {}) -> Error {
-	return {
-		kind        = .Build_Failed,
-		line        = token.line,
-		col         = token.col,
-		build_error = err,
-	}
 }
 
 error_name :: proc(kind: Error_Kind) -> string {

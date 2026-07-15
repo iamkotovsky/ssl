@@ -1,24 +1,33 @@
 # SSL Project Documentation
 
-These documents are the portable context for continuing development in another
-Codex task or on another computer.
+These documents describe the repository as it exists now and the design being
+built toward.
 
-Start with:
+- [project-context.md](project-context.md) is the factual snapshot: packages,
+  APIs, examples, tests, and known incompatibilities.
+- [design.md](design.md) records the current architectural decisions and marks
+  unfinished parts explicitly.
+- [roadmap.md](roadmap.md) gives the next implementation order from the current
+  codebase.
 
-1. [project-context.md](project-context.md) for the repository state and package
-   overview.
-2. [design.md](design.md) for the agreed bytecode, module, function, and closure
-   direction.
-3. [roadmap.md](roadmap.md) for the intended implementation order.
+The important package boundary is:
 
-The documents deliberately distinguish implemented behavior from planned
-behavior. `source.sa` is currently a design example, not input accepted by the
-implemented assembler.
+```text
+assembler / future compiler
+            |
+            v
+    bytecode/builder
+            |
+            v
+        bytecode
+            |
+            v
+       VM + runtime
+```
 
-When continuing on another computer, commit and push both the source changes
-and this directory. Ask the new model to inspect the repository and read these
-documents before making changes.
+`bytecode` is the compact, owned module representation. `bytecode/builder` is
+the convenient symbolic construction layer. The assembler, VM, and high-level
+front end are not complete yet.
 
-Keep these files updated when a design decision changes or a roadmap stage is
-implemented. In particular, move items from "planned" to "implemented" only
-after code and tests exist.
+Keep these files synchronized with source changes. Do not describe a planned
+feature as implemented until its code and focused tests exist.

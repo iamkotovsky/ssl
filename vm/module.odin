@@ -48,7 +48,7 @@ _mark_module_roots :: proc(module: ^Module_Instance) {
 @(private)
 _destroy_module :: proc(module: ^Module_Instance) {
 	assert(module != nil)
-	bytecode.destroy(module.definition)
+	bytecode.destroy(&module.definition)
 	for name in module.globals {
 		delete(name)
 	}

@@ -5,28 +5,33 @@ import "../bytecode"
 @(private)
 _Label_Symbol :: struct {
 	name:            string,
-	label:           bytecode.Label,
+	instruction:     bytecode.Instruction_Index,
 	defined:         bool,
 	first_reference: _Token,
 }
 
 @(private)
-_get_or_create_label :: proc(p: ^_Parser, name: string, reference: _Token = {}) -> bytecode.Label {
+_Label_Fixup :: struct {
+	instruction: bytecode.Instruction_Index,
+	label:       int,
+}
+
+@(private)
+_get_or_create_label :: proc(
+	p: ^_Parser,
+	name: string,
+	reference: _Token = {},
+) -> int {
 	if index, ok := p.label_indices[name]; ok {
 		symbol := &p.labels[index]
 		if symbol.first_reference.kind == .EOF && reference.kind != .EOF {
 			symbol.first_reference = reference
 		}
-		return symbol.label
+		return index
 	}
 
-	label := bytecode.create_label(&p.builder, name)
 	index := len(p.labels)
-	append(&p.labels, _Label_Symbol{
-		name            = name,
-		label           = label,
-		first_reference = reference,
-	})
+	append(&p.labels, _Label_Symbol{name = name, first_reference = reference})
 	p.label_indices[name] = index
-	return label
+	return index
 }

@@ -1,52 +1,62 @@
-export Point
+export global __start
 
 global std.fmt
-global Point
+global make_counter
+export global Point
 
-function __init
-    load.module "std.fmt"
-    store.global std.fmt
+func __init() {
+    // load.module "std.fmt"
+    // store.global std.fmt
+
+    mk.func .make_counter
+    store make_counter
+
+    mk.func .__start
+    store __start
  
-    make.class "Point"
-    store.global Point
+    mk.class "Point"
+    store Point
 
-    load.global Point.__init
-    load.global Point
+    mk.func .Point.__init
+    load Point
     get.field "define..."
-    call
-    return
-    
-function __start
-    make.i32 1
-    make.i32 2
-    load.global Point
-    call
+    call 2
+}
+
+func .__start() {
+    mk.int 1
+    mk.int 2
+    load Point
+    call 2
     get.field "__repr"
-    call
-    load.global std.fmt
+    call 1
+    load std.fmt
     get.field "print"
-    call
-    return
+    call 1
+}
 
-function make_counter { locals=1 }
-    make.i32 12
-    store.local 0
-    make.func .anonym1
-    return
+func .make_counter() {
+    x = mk.int 12
 
-function .anonym1 { capture=0 }
-    load.capture 0
-    make.i32 0
-    add
-    store.capture 0
-    return
+    // this is only a syntaxis sugar this function will be create globaly with needed capturing
+    function .anon1() |x| {
+        load x
+        dup
+        mk.int 0
+        add
+        store x
+        ret
+    }
     
-function Point.__init { artity=3 }
-    load.local 0
-    load.local 1
+    mk.func .anon1
+    ret
+}
+    
+func .Point.__init(self, x, y) {
+    load x
+    load self
     set.field "x"
-    load.local 0
-    load.local 2
+    load y
+    load self
     set.field "y"
-    return
-    
+}

@@ -1,0 +1,32 @@
+{
+    consts = {
+        [0] = "__start"
+        [1] = "other"
+    }
+
+    globals = 3
+    // [0] = add
+    // [2] = __start
+
+    exports = {
+        [0] = { 0, 2 } // __start, __start
+    }
+
+    funcs = {
+        // .add
+        [0] = { 
+            arity = 3 // x, _, y
+            captures = {
+                [0] = { local 0 } // x
+                [1] = { param 1 } // some_name
+                [2] = { capture 2 }
+            }
+            insts = {
+                .label_1
+                0000 Make_String 1 // "other"
+                0001 Make_Func   2 // .some_func
+                
+            }
+        }
+    }
+}   

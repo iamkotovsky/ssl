@@ -1,32 +1,26 @@
 package ssl
 
-import "core:fmt"
-import "core:os"
-
-Heap_Header :: struct {
-	marked: bool,
-	next: 	^Heap_Header
-}
-
-Heap :: struct {
-	start: ^Heap_Header,
-	count: int
-}
-
-alloc :: proc(heap: ^Heap, $T: typeid) -> ^T {
-	object := new(T)
-	object.next = heap.start
-	heap.start = object
-	heap.count += 1
-	return object
-}
-
-Object :: struct {
-	using header: Heap_Header,
-}
+import b "bytecode/builder"
+import "bytecode"
 
 main :: proc() {
-	heap: Heap
-	obj := alloc(&heap, Object)
-	
+	m: b.Module
+	defer b.destroy(&m)
+
+	start := b.export(&m, "__start")
+
+	start_func := b.function(&m, ".__start")
+	b.make_int(start_func, 1)
+	x := b.local(start_func, "a")
+	b.make_int(start_func, 12)
+	y := b.local(start_func, "b")
+	b.load(start_func, x)
+	// b.add
+
+	init := b.init(&m)
+	b.make_func(init, start_func)
+	b.store(init, start)
+
+	code := b.finish(&m)
+	bytecode.print(code)
 }

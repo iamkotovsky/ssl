@@ -2,13 +2,48 @@ package assembler
 
 import "../bytecode"
 import "core:strconv"
+import "core:strings"
 
 @(private)
 _Parser :: struct {
-	lexer:         _Lexer,
-	builder:       bytecode.Builder,
-	labels:        [dynamic]_Label_Symbol,
-	label_indices: map[string]int,
+	lexer:            _Lexer,
+	module_builder:   bytecode.Module_Builder,
+	function_builder: bytecode.Function_Builder,
+	labels:           [dynamic]_Label_Symbol,
+	label_indices:    map[string]int,
+	fixups:           [dynamic]_Label_Fixup,
+}
+
+@(private)
+@(rodata)
+_OPCODE_NAMES := [bytecode.Opcode]string {
+	.None          = "none",
+	.Load_Global   = "load.global",
+	.Load_Local    = "load.local",
+	.Load_Capture  = "load.capture",
+	.Store_Global  = "store.global",
+	.Store_Local   = "store.local",
+	.Store_Capture = "store.capture",
+	.Make_I8       = "make.i8",
+	.Make_I16      = "make.i16",
+	.Make_I32      = "make.i32",
+	.Make_I64      = "make.i64",
+	.Make_F32      = "make.f32",
+	.Make_F64      = "make.f64",
+	.Make_String   = "make.string",
+	.Make_Class    = "make.class",
+	.Make_Function = "make.func",
+	.Make_List     = "make.list",
+	.Call          = "call",
+	.Return        = "ret",
+	.Jump          = "jump",
+	.Get_Field     = "field.get",
+	.Set_Field     = "field.set",
+	.Add           = "add",
+	.Sub           = "sub",
+	.Mul           = "mul",
+	.Div           = "div",
+	.Halt          = "halt",
 }
 
 @(private)
@@ -19,9 +54,11 @@ _parser_init :: proc(p: ^_Parser, source: string) {
 
 @(private)
 _parser_destroy :: proc(p: ^_Parser) {
-	bytecode.destroy_builder(&p.builder)
+	bytecode.destroy_function_builder(&p.function_builder)
+	bytecode.destroy_module_builder(&p.module_builder)
 	delete(p.labels)
 	delete(p.label_indices)
+	delete(p.fixups)
 }
 
 @(private)
@@ -32,11 +69,21 @@ _parser_next :: proc(p: ^_Parser) -> _Token {
 @(private)
 _opcode_from_string :: proc(value: string) -> (bytecode.Opcode, bool) {
 	for opcode in bytecode.Opcode {
-		if bytecode.opcode_name(opcode) == value {
+		if _OPCODE_NAMES[opcode] == value {
 			return opcode, true
 		}
 	}
 	return .None, false
+}
+
+@(private)
+_opcode_operand :: proc(opcode: bytecode.Opcode) -> bytecode.Operand_Kind {
+	return bytecode.opcode_operand_kind(opcode)
+}
+
+@(private)
+_opcode_has_operand :: proc(opcode: bytecode.Opcode) -> bool {
+	return _opcode_operand(opcode) != .None
 }
 
 @(private)
@@ -58,90 +105,133 @@ _parse_float :: proc(token: _Token) -> (f64, Error) {
 }
 
 @(private)
-_emit_instruction :: proc(p: ^_Parser, opcode: bytecode.Opcode, operand: _Token) -> Error {
-	build_error: bytecode.Builder_Error
-	switch bytecode.opcode_operand(opcode) {
+_parse_u32 :: proc(token: _Token) -> (u32, Error) {
+	if token.kind != .Integer {
+		return 0, _error_at(.Invalid_Operand_Type, token)
+	}
+	value, err := _parse_integer(token)
+	if err.kind != .None {
+		return 0, err
+	}
+	if value < 0 || value > i64(max(u32)) {
+		return 0, _error_at(.Integer_Out_Of_Range, token)
+	}
+	return u32(value), _error(.None)
+}
+
+@(private)
+_emit_instruction :: proc(p: ^_Parser, opcode: bytecode.Opcode, token: _Token) -> Error {
+	switch _opcode_operand(opcode) {
 	case .None:
-		_, build_error = bytecode.emit(&p.builder, opcode)
+		bytecode.emit(&p.function_builder, opcode)
 	case .I8:
-		if operand.kind != .Integer {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .Integer {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		value, err := _parse_integer(operand)
+		value, err := _parse_integer(token)
 		if err.kind != .None {
 			return err
 		}
 		if value < i64(min(i8)) || value > i64(max(i8)) {
-			return _error_at(.Integer_Out_Of_Range, operand)
+			return _error_at(.Integer_Out_Of_Range, token)
 		}
-		_, build_error = bytecode.emit(&p.builder, opcode, i8(value))
+		bytecode.emit(&p.function_builder, opcode, i8(value))
 	case .I16:
-		if operand.kind != .Integer {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .Integer {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		value, err := _parse_integer(operand)
+		value, err := _parse_integer(token)
 		if err.kind != .None {
 			return err
 		}
 		if value < i64(min(i16)) || value > i64(max(i16)) {
-			return _error_at(.Integer_Out_Of_Range, operand)
+			return _error_at(.Integer_Out_Of_Range, token)
 		}
-		_, build_error = bytecode.emit(&p.builder, opcode, i16(value))
+		bytecode.emit(&p.function_builder, opcode, i16(value))
 	case .I32:
-		if operand.kind != .Integer {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .Integer {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		value, err := _parse_integer(operand)
+		value, err := _parse_integer(token)
 		if err.kind != .None {
 			return err
 		}
 		if value < i64(min(i32)) || value > i64(max(i32)) {
-			return _error_at(.Integer_Out_Of_Range, operand)
+			return _error_at(.Integer_Out_Of_Range, token)
 		}
-		_, build_error = bytecode.emit(&p.builder, opcode, i32(value))
+		bytecode.emit(&p.function_builder, opcode, i32(value))
 	case .I64:
-		if operand.kind != .Integer {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .Integer {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		value, err := _parse_integer(operand)
+		value, err := _parse_integer(token)
 		if err.kind != .None {
 			return err
 		}
-		_, build_error = bytecode.emit(&p.builder, opcode, value)
+		bytecode.emit(&p.function_builder, opcode, value)
 	case .F32:
-		if operand.kind != .Float {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .Float {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		value, err := _parse_float(operand)
+		value, err := _parse_float(token)
 		if err.kind != .None {
 			return err
 		}
-		_, build_error = bytecode.emit(&p.builder, opcode, f32(value))
+		bytecode.emit(&p.function_builder, opcode, f32(value))
 	case .F64:
-		if operand.kind != .Float {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .Float {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		value, err := _parse_float(operand)
+		value, err := _parse_float(token)
 		if err.kind != .None {
 			return err
 		}
-		_, build_error = bytecode.emit(&p.builder, opcode, value)
+		bytecode.emit(&p.function_builder, opcode, value)
 	case .Constant:
-		if operand.kind != .String {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .String {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		value := operand.value[1:len(operand.value) - 1]
-		constant := bytecode.make_constant(&p.builder, value)
-		_, build_error = bytecode.emit(&p.builder, opcode, constant)
+		value := token.value[1:len(token.value) - 1]
+		constant := bytecode.add_utf8(&p.module_builder, value)
+		bytecode.emit(&p.function_builder, opcode, constant)
+	case .Function:
+		value, err := _parse_u32(token)
+		if err.kind != .None {
+			return err
+		}
+		bytecode.emit(&p.function_builder, opcode, bytecode.Function_Index(value))
+	case .Global:
+		value, err := _parse_u32(token)
+		if err.kind != .None {
+			return err
+		}
+		bytecode.emit(&p.function_builder, opcode, bytecode.Global_Index(value))
 	case .Target:
-		if operand.kind != .Label || len(operand.value) <= 1 {
-			return _error_at(.Invalid_Operand_Type, operand)
+		if token.kind != .Label || len(token.value) <= 1 {
+			return _error_at(.Invalid_Operand_Type, token)
 		}
-		target := _get_or_create_label(p, operand.value, operand)
-		_, build_error = bytecode.emit(&p.builder, opcode, target)
-	}
-	if build_error != nil {
-		return _build_error_at(build_error, operand)
+		label := _get_or_create_label(p, token.value, token)
+		instruction := bytecode.emit(&p.function_builder, opcode, bytecode.Instruction_Index(0))
+		append(&p.fixups, _Label_Fixup{instruction, label})
+		return _error(.None)
+	case .Local:
+		value, err := _parse_u32(token)
+		if err.kind != .None {
+			return err
+		}
+		bytecode.emit(&p.function_builder, opcode, bytecode.Local_Index(value))
+	case .Capture:
+		value, err := _parse_u32(token)
+		if err.kind != .None {
+			return err
+		}
+		bytecode.emit(&p.function_builder, opcode, bytecode.Capture_Index(value))
+	case .Count:
+		value, err := _parse_u32(token)
+		if err.kind != .None {
+			return err
+		}
+		bytecode.emit(&p.function_builder, opcode, value)
 	}
 	return _error(.None)
 }
@@ -154,7 +244,7 @@ _parse_instruction :: proc(p: ^_Parser, token: _Token) -> Error {
 	}
 
 	operand := _parser_next(p)
-	expects_operand := bytecode.opcode_has_operand(opcode)
+	expects_operand := _opcode_has_operand(opcode)
 	if operand.kind == .EOF || operand.kind == .Line {
 		if expects_operand {
 			return _error_at(.Missing_Operand, operand)
@@ -186,15 +276,12 @@ _parse_label :: proc(p: ^_Parser, token: _Token) -> Error {
 		return _error_at(.Expected_Newline, end)
 	}
 
-	label := _get_or_create_label(p, token.value)
-	index := p.label_indices[token.value]
+	index := _get_or_create_label(p, token.value)
 	symbol := &p.labels[index]
 	if symbol.defined {
 		return _error_at(.Invalid_Label, token)
 	}
-	if build_error := bytecode.bind_label(&p.builder, label); build_error != nil {
-		return _build_error_at(build_error, token)
-	}
+	symbol.instruction = bytecode.position(&p.function_builder)
 	symbol.defined = true
 	return _error(.None)
 }
@@ -205,12 +292,35 @@ _finish :: proc(p: ^_Parser) -> (bytecode.Module, Error) {
 		if !symbol.defined {
 			return {}, _error_at(.Label_Not_Defined, symbol.first_reference)
 		}
+		if int(symbol.instruction) >= len(p.function_builder.instructions) {
+			return {}, _error(.Build_Failed)
+		}
 	}
-	module, build_error := bytecode.finish(&p.builder)
-	if build_error != nil {
-		return {}, _build_error_at(build_error)
+
+	for fixup in p.fixups {
+		target := p.labels[fixup.label].instruction
+		bytecode.patch_target(&p.function_builder, fixup.instruction, target)
 	}
-	return module, _error(.None)
+
+	function := bytecode.finish_function(&p.function_builder)
+	initializer := bytecode.add_function(&p.module_builder, function)
+	bytecode.set_initializer(&p.module_builder, initializer)
+
+	if len(p.labels) > 0 {
+		labels := make([]bytecode.Debug_Label, len(p.labels))
+		for symbol, index in p.labels {
+			labels[index] = {
+				name        = strings.clone(symbol.name),
+				instruction = symbol.instruction,
+			}
+		}
+		bytecode.add_function_debug(
+			&p.module_builder,
+			bytecode.Function_Debug_Info{function = initializer, labels = labels},
+		)
+	}
+
+	return bytecode.finish_module(&p.module_builder), _error(.None)
 }
 
 parse :: proc(source: string) -> (bytecode.Module, Error) {
