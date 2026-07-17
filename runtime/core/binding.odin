@@ -19,11 +19,3 @@ Read_Only_Binding_Error :: struct {
 Frozen_Object_Error :: struct {}
 Frozen_Class_Error :: struct {}
 Sealed_Class_Error :: struct {}
-
-Binding_Error :: union {
-	Read_Only_Binding_Error,
-	Frozen_Object_Error,
-	Frozen_Class_Error,
-	Sealed_Class_Error,
-}
-

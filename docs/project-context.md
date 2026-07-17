@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 ## Current Status
 
@@ -13,7 +13,7 @@ not implemented end to end.
 Verified commands:
 
 ```powershell
-odin test bytecode
+odin check bytecode -no-entry-point
 odin test bytecode\builder
 odin check runtime\core -no-entry-point
 odin check lexer -no-entry-point
@@ -24,12 +24,14 @@ odin run .
 
 At this update:
 
-- `bytecode`: 1 test passes.
-- `bytecode/builder`: 8 tests pass.
-- `runtime/core`, `lexer`, `parser`, and the root package compile.
+- `bytecode`: compiles as a test-free data-layout package.
+- `bytecode/builder`: 1 end-to-end test passes.
+- `runtime/core`, `vm`, `lexer`, `parser`, and the root package compile.
+- `runtime/core` now exposes the execution-facing `Context` contract; the VM
+  callback implementation is the next execution step.
 - The root demo runs and prints the constructed module.
-- `vm` does not compile because `Frame.ip` still uses the removed
-  `bytecode.Instruction_Index` name.
+- `vm` compiles as scaffolding, although `Frame.ip` currently has the wrong
+  semantic type (`Func_Idx` rather than `Inst_Idx`).
 - `assembler` does not compile because its parser still targets the removed
   bytecode builder API and old opcodes.
 
@@ -90,6 +92,8 @@ Implemented:
 
 - Module-scoped handles for constants, globals, functions, parameters, locals,
   and labels.
+- Private construction storage and numeric IDs; callers use opaque handles
+  instead of mutating builder internals.
 - UTF-8 constants, globals, named exports, ordinary functions, and one
   initializer.
 - Separate parameter and local handles.
@@ -98,13 +102,17 @@ Implemented:
 - Function-scoped labels with forward binding.
 - `finish`, which resolves symbolic handles, builds debug metadata, transfers
   data to an independently owned `bytecode.Module`, and consumes the builder.
-- Assertions at `finish` for programmer mistakes such as foreign handles,
-  invalid indices, duplicate/unbound labels, duplicate export names, and
-  missing initialization.
+- Assertions at the first operation that can identify a programmer mistake:
+  invalid handles, module/function mismatches, duplicate label bindings, and
+  duplicate export names are rejected during construction.
+- `finish` retains only whole-module checks that cannot be decided earlier,
+  such as missing initialization, unbound labels, and labels left at the end
+  without a target instruction.
 
 Names are optional debug metadata except for export names. Duplicate debug
 names are allowed; symbol-table policy belongs to a source assembler or
-compiler, not this builder.
+compiler, not this builder. Optional builder names use `Maybe(string)` and
+`nil` rather than treating `""` as absence.
 
 Current limitation: `local` assigns sequential local indices and records debug
 metadata, but the builder does not yet model scopes, stack depth, temporary
@@ -125,19 +133,27 @@ Implemented:
 - Runtime bootstrapping for the mutually related core `Object` and `Class`
   classes.
 - Root traversal for the core runtime state.
+- `Context`, which combines a runtime with an opaque executor interface while
+  keeping `runtime/core` independent from `vm`.
+- Stack helpers for length, push, peek, and current-frame parameter access.
+- Separate `call` and `dispatch` paths plus a common stack-based return path.
+- A shared runtime `Error` union for raised language values and recoverable
+  object/class mutation failures.
+- Stack-facing object and class constructors; raw allocation helpers remain
+  private to the runtime core.
 
 Not implemented:
 
 - Concrete runtime integer, float, string, list, tuple, or nil objects.
 - Native and bytecode function objects.
-- The callable/special-method protocol.
+- Native and bytecode callable object types and their concrete dispatch logic.
+- The VM-side implementation of the `Context` executor callbacks.
 - Closures and open/closed upvalues.
 - A complete GC scheduling and error-propagation policy.
 
 ## `vm`
 
-The VM package is scaffolding and is temporarily incompatible with the renamed
-bytecode API.
+The VM package compiles as scaffolding but does not execute bytecode yet.
 
 Present structures:
 
@@ -149,7 +165,8 @@ Present structures:
 
 Temporary/stale parts:
 
-- `Frame.ip` refers to the old `Instruction_Index` type.
+- `Frame.ip` currently uses `Func_Idx`; it must use `Inst_Idx` when execution is
+  implemented.
 - Module globals still use `map[string]core.Value`; the intended representation
   is an indexed `[]core.Value` matching `bytecode.Global_Idx`.
 - There is no dispatch loop, call/return implementation, module initialization,

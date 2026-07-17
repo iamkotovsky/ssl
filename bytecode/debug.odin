@@ -14,7 +14,7 @@ Debug_Info :: struct {
 
 Func_Debug_Info :: struct {
 	func:   Func_Idx,
-	name:   string,
+	name:   Maybe(string),
 	params: []Debug_Name,
 	locals: []Debug_Name,
 	labels: []Debug_Label,
@@ -83,7 +83,7 @@ _print_exports :: proc(module: Module) {
 _print_export_comment :: proc(module: Module, value: Export) {
 	fmt.print(" //")
 	name_idx := int(value.name)
-	if name_idx >= 0 && name_idx < len(module.consts) {
+	if name_idx < len(module.consts) {
 		constant := module.consts[name_idx]
 		if constant.kind == .Utf8 {
 			fmt.printf(" %s", constant.as_utf8)
@@ -93,9 +93,9 @@ _print_export_comment :: proc(module: Module, value: Export) {
 	} else {
 		fmt.print(" _")
 	}
-	name, ok := _debug_name(module.debug.globals, u32(value.global))
-	if ok {
-		fmt.printf(", %s", name)
+	name := _debug_name(module.debug.globals, u32(value.global))
+	if name != nil {
+		fmt.printf(", %s", name.?)
 	} else {
 		fmt.print(", _")
 	}
@@ -113,13 +113,13 @@ _print_funcs :: proc(module: Module) {
 		info, _ := _func_debug_info(module.debug, idx)
 		if idx == module.init {
 			fmt.println("        // init")
-		} else if info.name != "" {
-			fmt.printfln("        // %s", info.name)
+		} else if info.name != nil {
+			fmt.printfln("        // %s", info.name.?)
 		}
 		fmt.printf("        [%d] = ", idx)
 		fmt.println("{")
 		_print_arity(func.arity, info)
-		_print_captures(func.captures, info)
+		_print_captures(func.captures)
 		_print_insts(module, func.insts, info)
 		fmt.println("        }")
 		if raw_idx + 1 < len(module.funcs) {
@@ -138,9 +138,9 @@ _print_arity :: proc(arity: u32, debug: Func_Debug_Info) {
 			if raw_idx != 0 {
 				fmt.print(", ")
 			}
-			name, ok := _debug_name(debug.params, u32(raw_idx))
-			if ok {
-				fmt.print(name)
+			name := _debug_name(debug.params, u32(raw_idx))
+			if name != nil {
+				fmt.print(name.?)
 			} else {
 				fmt.print("_")
 			}
@@ -150,7 +150,7 @@ _print_arity :: proc(arity: u32, debug: Func_Debug_Info) {
 }
 
 @(private)
-_print_captures :: proc(captures: []Capture, debug: Func_Debug_Info) {
+_print_captures :: proc(captures: []Capture) {
 	if len(captures) == 0 {
 		fmt.println("            captures = {}")
 		return
@@ -161,10 +161,6 @@ _print_captures :: proc(captures: []Capture, debug: Func_Debug_Info) {
 		fmt.print("{ ")
 		fmt.printf("%s %d", _capture_kind_name(value.kind), value.idx)
 		fmt.print(" }")
-		name, ok := _capture_debug_name(debug, value)
-		if ok {
-			fmt.printf(" // %s", name)
-		}
 		fmt.println()
 	}
 	fmt.println("            }")
@@ -179,19 +175,6 @@ _capture_kind_name :: proc(kind: Capture_Kind) -> string {
 		return "local"
 	case .Capture:
 		return "capture"
-	}
-	unreachable()
-}
-
-@(private)
-_capture_debug_name :: proc(debug: Func_Debug_Info, value: Capture) -> (string, bool) {
-	switch value.kind {
-	case .Param:
-		return _debug_name(debug.params, value.idx)
-	case .Local:
-		return _debug_name(debug.locals, value.idx)
-	case .Capture:
-		return "", false
 	}
 	unreachable()
 }
@@ -215,7 +198,7 @@ _print_insts :: proc(module: Module, insts: []Inst, debug: Func_Debug_Info) {
 @(private)
 _print_labels :: proc(labels: []Debug_Label, inst: Inst_Idx) {
 	for label in labels {
-		if label.inst == inst && label.name != "" {
+		if label.inst == inst {
 			fmt.printfln("                %s", label.name)
 		}
 	}
@@ -246,24 +229,20 @@ _print_operand_comment :: proc(
 	#partial switch opcode {
 	case .Make_String, .Make_Class, .Get_Field, .Set_Field:
 		idx := int(value)
-		if idx >= 0 && idx < len(module.consts) {
+		if idx < len(module.consts) {
 			constant := module.consts[idx]
 			if constant.kind == .Utf8 {
 				fmt.printf(" // %q", constant.as_utf8)
 			}
 		}
 	case .Make_Func:
-		name, ok := _func_debug_name(module.debug, Func_Idx(value))
-		_print_name_comment(name, ok)
+		_print_name_comment(_func_debug_name(module.debug, Func_Idx(value)))
 	case .Load_Global, .Store_Global:
-		name, ok := _debug_name(module.debug.globals, value)
-		_print_name_comment(name, ok)
+		_print_name_comment(_debug_name(module.debug.globals, value))
 	case .Load_Param:
-		name, ok := _debug_name(debug.params, value)
-		_print_name_comment(name, ok)
+		_print_name_comment(_debug_name(debug.params, value))
 	case .Load_Local, .Store_Local:
-		name, ok := _debug_name(debug.locals, value)
-		_print_name_comment(name, ok)
+		_print_name_comment(_debug_name(debug.locals, value))
 	case .Jump:
 		_print_label_comment(debug.labels, Inst_Idx(value))
 	case:
@@ -271,9 +250,9 @@ _print_operand_comment :: proc(
 }
 
 @(private)
-_print_name_comment :: proc(name: string, ok: bool) {
-	if ok {
-		fmt.printf(" // %s", name)
+_print_name_comment :: proc(name: Maybe(string)) {
+	if name != nil {
+		fmt.printf(" // %s", name.?)
 	}
 }
 
@@ -281,7 +260,7 @@ _print_name_comment :: proc(name: string, ok: bool) {
 _print_label_comment :: proc(labels: []Debug_Label, inst: Inst_Idx) {
 	first := true
 	for label in labels {
-		if label.inst != inst || label.name == "" {
+		if label.inst != inst {
 			continue
 		}
 		if first {
@@ -293,13 +272,13 @@ _print_label_comment :: proc(labels: []Debug_Label, inst: Inst_Idx) {
 }
 
 @(private)
-_debug_name :: proc(values: []Debug_Name, idx: u32) -> (string, bool) {
+_debug_name :: proc(values: []Debug_Name, idx: u32) -> Maybe(string) {
 	for value in values {
-		if value.idx == idx && value.name != "" {
-			return value.name, true
+		if value.idx == idx {
+			return value.name
 		}
 	}
-	return "", false
+	return nil
 }
 
 @(private)
@@ -313,9 +292,12 @@ _func_debug_info :: proc(debug: Debug_Info, func: Func_Idx) -> (Func_Debug_Info,
 }
 
 @(private)
-_func_debug_name :: proc(debug: Debug_Info, func: Func_Idx) -> (string, bool) {
+_func_debug_name :: proc(debug: Debug_Info, func: Func_Idx) -> Maybe(string) {
 	info, ok := _func_debug_info(debug, func)
-	return info.name, ok && info.name != ""
+	if !ok {
+		return nil
+	}
+	return info.name
 }
 
 @(private)
@@ -328,7 +310,9 @@ _destroy_debug_names :: proc(values: []Debug_Name) {
 
 @(private)
 _destroy_func_debug_info :: proc(info: ^Func_Debug_Info) {
-	delete(info.name)
+	if info.name != nil {
+		delete(info.name.?)
+	}
 	_destroy_debug_names(info.params)
 	_destroy_debug_names(info.locals)
 	for label in info.labels {

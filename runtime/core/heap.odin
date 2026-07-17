@@ -1,17 +1,13 @@
 package core
 
-Mark_Proc :: proc(value: Value)
-Destroy_Proc :: proc(value: Value)
-
-Heap_Descriptor :: struct {
-	mark:    Mark_Proc,
-	destroy: Destroy_Proc,
-}
+Mark_Proc :: proc(value: ^Heap_Header)
+Destroy_Proc :: proc(value: ^Heap_Header)
 
 Heap_Header :: struct {
-	descriptor: Heap_Descriptor,
-	next:       ^Heap_Header,
-	marked:     bool,
+	mark:    Mark_Proc,
+	destroy: Destroy_Proc,
+	next:    ^Heap_Header,
+	marked:  bool,
 }
 
 Heap :: struct {
@@ -28,6 +24,7 @@ alloc :: proc(heap: ^Heap, $T: typeid) -> ^T {
 	object.next = heap.first
 	heap.first = &object.header
 	heap.count += 1
+
 	return value
 }
 
@@ -37,8 +34,8 @@ mark :: proc(value: Value) {
 	}
 
 	value.marked = true
-	if value.descriptor.mark != nil {
-		value.descriptor.mark(value)
+	if value.mark != nil {
+		value.mark(value)
 	}
 }
 
@@ -75,6 +72,6 @@ destroy_heap :: proc(heap: ^Heap) {
 @(private)
 _destroy_header :: proc(header: ^Heap_Header) {
 	assert(header != nil)
-	assert(header.descriptor.destroy != nil)
-	header.descriptor.destroy(cast(Value)header)
+	assert(header.destroy != nil)
+	header.destroy(header)
 }

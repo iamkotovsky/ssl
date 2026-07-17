@@ -8,8 +8,13 @@ Object_Flag :: enum {
 
 Object_Flags :: bit_set[Object_Flag]
 
+Call_Proc :: proc(ctx: ^Context, value: Value) -> Error
+Add_Proc :: proc(ctx: ^Context, lhs, rhs: Value) -> Error
+
 Object :: struct {
 	using header: Heap_Header,
+	call:         Call_Proc,
+	add:          Add_Proc,
 	class:        ^Class,
 	fields:       map[string]Binding,
 	flags:        Object_Flags,
@@ -22,13 +27,20 @@ init_object :: proc(
 	class: ^Class,
 ) {
 	assert(object != nil)
-	assert(object.descriptor.destroy != nil, "object must be allocated by core.alloc")
+	assert(object.destroy != nil, "object must be allocated by core.alloc")
 	object.class = class
 }
 
-new_object :: proc(runtime: ^Runtime, class: ^Class) -> Value {
-	assert(runtime != nil)
+// Stack effect: ... -> ... object.
+new_object :: proc(ctx: ^Context, class: ^Class) {
+	_assert_context(ctx)
 	assert(class != nil)
+	object := _new_object(ctx.runtime, class)
+	push(ctx, object)
+}
+
+@(private)
+_new_object :: proc(runtime: ^Runtime, class: ^Class) -> Value {
 	object := alloc(&runtime.heap, Object)
 	init_object(object, class)
 	return object
@@ -39,7 +51,7 @@ define_field :: proc(
 	name: string,
 	value: Value,
 	flags: Binding_Flags = {},
-) -> Binding_Error {
+) -> Error {
 	assert(object != nil)
 	if .Frozen in object.flags {
 		return Frozen_Object_Error{}
@@ -70,10 +82,8 @@ freeze_object :: proc(object: Value) {
 
 @(private)
 _init_object :: proc(object: Value) {
-	object.descriptor = {
-		mark    = _object_mark,
-		destroy = _object_destroy,
-	}
+	object.mark = _object_mark
+	object.destroy = _object_destroy
 	object.fields = make(map[string]Binding)
 }
 

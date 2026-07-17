@@ -5,6 +5,7 @@ import "bytecode"
 
 main :: proc() {
 	m: b.Module
+	
 	defer b.destroy(&m)
 
 	start := b.export(&m, "__start")

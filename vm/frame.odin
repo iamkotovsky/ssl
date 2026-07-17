@@ -6,7 +6,7 @@ import core "../runtime/core"
 Frame :: struct {
 	module:    ^Module_Instance,
 	function:  core.Value,
-	ip:        bytecode.Instruction_Index,
+	ip:        bytecode.Func_Idx,
 	stack_base: int,
 }
 

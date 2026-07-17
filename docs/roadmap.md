@@ -13,6 +13,8 @@ Each stage should leave the packages it touches compiling with focused tests.
   parameters, locals, and labels.
 - Builder lowering through `finish` with ownership and invariant checks.
 - Runtime heap, object, class, binding, and core-runtime bootstrapping.
+- Runtime `Context` boundary with stack, parameter, call, dispatch, and return
+  callbacks independent of the VM package.
 - VM/program/module scaffolding.
 
 ## Stage 1: Finish the Builder Execution Model
@@ -33,7 +35,8 @@ not sufficient for real control flow.
 ## Stage 2: Complete Runtime Value and Callable Foundations
 
 - Add nil, integer, float, UTF-8 string, and basic collection runtime objects.
-- Define the core callable protocol shared by native and bytecode functions.
+- Implement the core callable protocol for native and bytecode function
+  objects through `Context`.
 - Add native-function and bytecode-function classes.
 - Define special-method fallback and optimized descriptor dispatch.
 - Finalize freezing/read-only rules for core classes and special methods.
@@ -46,6 +49,7 @@ not sufficient for real control flow.
 - Define frame layout for parameters, local base, active locals, and
   temporaries.
 - Implement the fetch/decode/dispatch loop.
+- Implement the VM-side `Context` executor callbacks and frame transitions.
 - Implement constants, global/parameter/local access, arithmetic, jumps,
   fields, classes, calls, returns, and halt.
 - Execute the initializer during module loading.
@@ -97,6 +101,7 @@ are stable, otherwise its syntax would target a moving API.
 
 ## Immediate Next Step
 
-Specify the builder's stack, scope, call, and return invariants on paper and in
-tests before adding more instruction helpers. That decision controls locals,
-branches, loops, frames, closures, and the future assembler grammar.
+Implement the VM stack and frame primitives behind `core.Context`, starting
+with push, peek, parameter access, call-frame creation, dispatch, and return.
+This provides the execution substrate needed by native and bytecode callable
+objects.

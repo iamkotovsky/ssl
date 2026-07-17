@@ -20,9 +20,9 @@ make_utf8 :: proc(value: string) -> Const {
 }
 
 @(private)
-_destroy_const :: proc(value: Const) {
-	switch value.kind {
+_destroy_const :: proc(const: Const) {
+	switch const.kind {
 	case .Utf8:
-		delete(value.as_utf8)
+		delete(const.as_utf8)
 	}
 }

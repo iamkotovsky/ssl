@@ -1,7 +1,7 @@
 package bytecode
 
 Func_Idx :: distinct u32
-Capture_Idx :: distinct u32
+Global_Idx :: distinct u32
 
 Capture_Kind :: enum u8 {
 	Param,
@@ -20,28 +20,6 @@ Func :: struct {
 	insts:    []Inst,
 }
 
-// Takes ownership of captures and insts.
-make_func :: proc(
-	arity: u32,
-	captures: []Capture,
-	insts: []Inst,
-) -> Func {
-	return {
-		arity    = arity,
-		captures = captures,
-		insts    = insts,
-	}
-}
-
-@(private)
-_destroy_func :: proc(func: ^Func) {
-	delete(func.captures)
-	delete(func.insts)
-	func^ = {}
-}
-
-Global_Idx :: distinct u32
-
 Export :: struct {
 	name:   Const_Idx,
 	global: Global_Idx,
@@ -54,6 +32,19 @@ Module :: struct {
 	funcs:   []Func,
 	exports: []Export,
 	debug:   Debug_Info,
+}
+
+// Takes ownership of captures and insts.
+make_func :: proc(
+	arity: u32,
+	captures: []Capture,
+	insts: []Inst,
+) -> Func {
+	return {
+		arity    = arity,
+		captures = captures,
+		insts    = insts,
+	}
 }
 
 // Takes ownership of consts, funcs, exports, and debug.
@@ -88,4 +79,11 @@ destroy :: proc(module: ^Module) {
 	delete(module.exports)
 	_destroy_debug_info(&module.debug)
 	module^ = {}
+}
+
+@(private)
+_destroy_func :: proc(func: ^Func) {
+	delete(func.captures)
+	delete(func.insts)
+	func^ = {}
 }

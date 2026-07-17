@@ -14,10 +14,6 @@ Final_Superclass_Error :: struct {
 	superclass: ^Class,
 }
 
-Class_Error :: union {
-	Final_Superclass_Error,
-}
-
 Class :: struct {
 	using object:       Object,
 	name:               string,
@@ -33,23 +29,23 @@ init_class :: proc(
 	superclass: ^Class,
 ) {
 	assert(class != nil)
-	assert(class.descriptor.destroy != nil, "class must be allocated by core.alloc")
+	assert(class.destroy != nil, "class must be allocated by core.alloc")
 	init_object(class, metaclass)
-	class.descriptor = {
-		mark    = _class_mark,
-		destroy = _class_destroy,
-	}
+	class.mark = _class_mark
+	class.destroy = _class_destroy
 	class.name = strings.clone(name)
 	class.superclass = superclass
 	class.methods = make(map[string]Binding)
 }
 
+// Stack effect: ... -> ... class on success.
 new_class :: proc(
-	runtime: ^Runtime,
+	ctx: ^Context,
 	name: string,
 	superclass: ^Class = nil,
-) -> (^Class, Class_Error) {
-	assert(runtime != nil)
+) -> Error {
+	_assert_context(ctx)
+	runtime := ctx.runtime
 	assert(runtime.classes.class != nil, "runtime is not initialized")
 	assert(runtime.classes.object != nil, "runtime is not initialized")
 
@@ -58,12 +54,23 @@ new_class :: proc(
 		parent = runtime.classes.object
 	}
 	if .Final in parent.class_flags {
-		return nil, Final_Superclass_Error{parent}
+		return Final_Superclass_Error{parent}
 	}
 
+	class := _new_class(runtime, name, parent)
+	push(ctx, class)
+	return nil
+}
+
+@(private)
+_new_class :: proc(
+	runtime: ^Runtime,
+	name: string,
+	superclass: ^Class,
+) -> ^Class {
 	class := alloc(&runtime.heap, Class)
-	init_class(class, runtime.classes.class, name, parent)
-	return class, nil
+	init_class(class, runtime.classes.class, name, superclass)
+	return class
 }
 
 define_method :: proc(
@@ -71,7 +78,7 @@ define_method :: proc(
 	name: string,
 	method: Value,
 	flags: Binding_Flags = {},
-) -> Binding_Error {
+) -> Error {
 	assert(class != nil)
 	if .Frozen in class.class_flags {
 		return Frozen_Class_Error{}

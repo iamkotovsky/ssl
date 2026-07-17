@@ -108,7 +108,11 @@ _make_inst_f64 :: proc(opcode: Opcode, value: f64) -> Inst {
 }
 
 @(private)
-_make_inst :: proc(opcode: Opcode, kind: Operand_Kind, operand: Operand = {}) -> Inst {
+_make_inst :: proc(
+	opcode: Opcode,
+	kind: Operand_Kind,
+	operand: Operand = {},
+) -> Inst {
 	assert(opcode_operand_kind(opcode) == kind, "bytecode opcode and operand kind mismatch")
 	return {opcode, operand}
 }

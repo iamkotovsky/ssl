@@ -112,12 +112,20 @@ bindings explicitly.
 ## Builder Validation
 
 The builder stores semantic operands as Odin unions of stable handles. It keeps
-construction convenient and delays cross-entity checks until `finish`.
+construction convenient and validates each invariant at the earliest operation
+that has enough information.
 
-`finish` is the trust boundary between symbolic construction and raw bytecode.
-It resolves labels and handles and asserts internal invariants. This builder is
-a programming API, so misuse is treated as a programmer error rather than a
-recoverable source diagnostic.
+Loads, stores, function creation, jumps, and label binding immediately reject
+invalid handles and module/function ownership mismatches. Export declaration
+immediately rejects duplicate names. Label binding immediately rejects a
+second binding.
+
+`finish` is still the trust boundary between symbolic construction and raw
+bytecode. It resolves valid handles and checks only incomplete whole-program
+state that cannot be known earlier: a missing initializer, an unbound label, or
+a label whose final target is past the function's instruction array. This
+builder is a programming API, so misuse is treated as a programmer error rather
+than a recoverable source diagnostic.
 
 Recoverable syntax, duplicate-symbol, and user-input errors belong to an
 assembler or compiler before it calls `finish`.
@@ -164,16 +172,39 @@ separate execution mechanics from runtime behavior:
 - Native and bytecode functions are different runtime classes behind the same
   call protocol.
 
-The exact `Call` and `Return` stack contracts are not finalized. They must be
-specified before execution is implemented, including argument count, whether
-every successful call produces exactly one value, and how language-level
-no-result behavior is represented (most likely by a singleton nil-like value).
+`core.Context` is the boundary between these layers. It contains the runtime
+and an opaque executor callback table, but it does not depend on the `vm`
+package. Runtime operations can therefore inspect parameters, push values,
+call other values, dispatch a resolved callable, and return without creating a
+package cycle.
+
+Arguments and results are passed through the VM stack so every live language
+value remains visible to garbage collection. The initial call contract is:
+
+```text
+... arguments callee -> ... result
+```
+
+`core.call` asks the executor to create a frame and invoke the callee from the
+stack. `core.dispatch` enters an already resolved callable through the current
+frame; this is the path used after an operation such as `add` resolves a
+special method. Native and bytecode implementations use the same frame shape.
+They publish their result on the stack and finish through `core.return_value`.
+
+Every successful call produces exactly one value. Language-level procedures
+that have no meaningful result will return a singleton nil-like object rather
+than producing a different stack shape.
 
 ## Objects, Classes, and Special Methods
 
 The runtime core contains only universal mechanisms: heap allocation, object
 storage, classes, fields/methods, and core runtime roots. Concrete built-in
 types should be added above this foundation when possible.
+
+Public runtime constructors are stack-facing: for example, `new_object` and
+`new_class` push the newly allocated value through `Context` immediately.
+Private raw constructors exist only for runtime bootstrapping and other
+internal code that must initialize an object before exposing it to execution.
 
 An object will eventually have core operations such as call, arithmetic, field
 access, indexing, and representation. The intended pattern is:
@@ -215,8 +246,9 @@ the same cell.
 Execution uses numeric indices. Optional debug information maps those indices
 to names for globals, functions, parameters, locals, and labels.
 
-Names are not required to be unique. Empty names are omitted. A label's name is
-debug metadata attached to a function-scoped instruction target.
+Names are not required to be unique. Optional names use `Maybe(string)`: `nil`
+means that no name was provided. A label's name is debug metadata attached to a
+function-scoped instruction target.
 
 The full developer dump prints constants and all structural fields. Empty
 collections use `{}`. Serialization should allow debug information to be
