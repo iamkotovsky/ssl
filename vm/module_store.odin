@@ -29,7 +29,7 @@ add_module :: proc(
 	module := new(Module_Instance)
 	module.name = strings.clone(name)
 	module.definition = definition
-	module.globals = make(map[string]core.Value)
+	module.globals = make([]core.Value, definition.globals)
 	module.state = .Loaded
 	store.modules[module.name] = module
 	return module, nil

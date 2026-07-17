@@ -1,14 +1,14 @@
 # Project Context
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 ## Current Status
 
 SSL is an Odin project for a dynamic, object-oriented scripting language. The
 repository currently has a usable bytecode memory model and a symbolic
-bytecode builder. The object/class runtime foundation also compiles. Execution,
-assembly parsing for the new model, and the high-level language front end are
-not implemented end to end.
+bytecode builder. The object/class runtime foundation and first VM execution
+loop also compile. Assembly parsing for the new model and the high-level
+language front end are not implemented end to end.
 
 Verified commands:
 
@@ -16,6 +16,8 @@ Verified commands:
 odin check bytecode -no-entry-point
 odin test bytecode\builder
 odin check runtime\core -no-entry-point
+odin check runtime\builtin -no-entry-point
+odin test vm
 odin check lexer -no-entry-point
 odin check parser -no-entry-point
 odin check .
@@ -27,11 +29,14 @@ At this update:
 - `bytecode`: compiles as a test-free data-layout package.
 - `bytecode/builder`: 1 end-to-end test passes.
 - `runtime/core`, `vm`, `lexer`, `parser`, and the root package compile.
-- `runtime/core` now exposes the execution-facing `Context` contract; the VM
-  callback implementation is the next execution step.
+- `runtime/core` exposes the execution-facing `Context` contract and `vm`
+  implements its stack, frame, call, return, raise, and bytecode-switch
+  callbacks.
+- `runtime/builtin` contains bytecode `Function` and Odin-backed
+  `Native_Function` objects plus their runtime classes.
 - The root demo runs and prints the constructed module.
-- `vm` compiles as scaffolding, although `Frame.ip` currently has the wrong
-  semantic type (`Func_Idx` rather than `Inst_Idx`).
+- `vm` has an initial fetch/decode/dispatch loop and 2 focused bytecode/native
+  call tests. Value-type and object opcodes remain intentionally incomplete.
 - `assembler` does not compile because its parser still targets the removed
   bytecode builder API and old opcodes.
 
@@ -135,8 +140,8 @@ Implemented:
 - Root traversal for the core runtime state.
 - `Context`, which combines a runtime with an opaque executor interface while
   keeping `runtime/core` independent from `vm`.
-- Stack helpers for length, push, peek, and current-frame parameter access.
-- Separate `call` and `dispatch` paths plus a common stack-based return path.
+- Stack helpers for push, peek, and current-frame parameter access.
+- A call path, bytecode-function switch, and common stack-based return path.
 - A shared runtime `Error` union for raised language values and recoverable
   object/class mutation failures.
 - Stack-facing object and class constructors; raw allocation helpers remain
@@ -145,32 +150,34 @@ Implemented:
 Not implemented:
 
 - Concrete runtime integer, float, string, list, tuple, or nil objects.
-- Native and bytecode function objects.
-- Native and bytecode callable object types and their concrete dispatch logic.
-- The VM-side implementation of the `Context` executor callbacks.
+- Special-method fallback for ordinary callable objects.
 - Closures and open/closed upvalues.
 - A complete GC scheduling and error-propagation policy.
 
 ## `vm`
 
-The VM package compiles as scaffolding but does not execute bytecode yet.
+The VM package has its initial execution substrate.
 
 Present structures:
 
 - `Program`, which owns a runtime and a module store.
-- `VM`, with a shared value stack and frame stack.
+- `VM`, with a shared value stack, frame stack, bytecode call stack, and
+  runtime `Context`.
 - `Module_Store` and lifecycle states.
 - `Module_Instance`, which owns a bytecode module and runtime globals.
 - Root traversal and destruction paths.
 
-Temporary/stale parts:
+Implemented execution basics:
 
-- `Frame.ip` currently uses `Func_Idx`; it must use `Inst_Idx` when execution is
-  implemented.
-- Module globals still use `map[string]core.Value`; the intended representation
-  is an indexed `[]core.Value` matching `bytecode.Global_Idx`.
-- There is no dispatch loop, call/return implementation, module initialization,
-  or export linking.
+- Stack-only frame windows containing parameters, the callee, locals, and
+  temporaries.
+- Common call/return mechanics for native and bytecode functions.
+- Indexed module globals.
+- Fetch/decode/dispatch for global, parameter, and local access, function
+  creation, calls, returns, jumps, and halt.
+
+Still missing are the remaining value/object opcodes, module initialization,
+export linking, closures, and complete error unwinding.
 
 ## `assembler`
 

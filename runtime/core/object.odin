@@ -8,8 +8,8 @@ Object_Flag :: enum {
 
 Object_Flags :: bit_set[Object_Flag]
 
-Call_Proc :: proc(ctx: ^Context, value: Value) -> Error
-Add_Proc :: proc(ctx: ^Context, lhs, rhs: Value) -> Error
+Call_Proc :: proc(ctx: ^Context, object: Value) -> Error
+Add_Proc :: proc(ctx: ^Context, object: Value) -> Error
 
 Object :: struct {
 	using header: Heap_Header,
@@ -84,7 +84,14 @@ freeze_object :: proc(object: Value) {
 _init_object :: proc(object: Value) {
 	object.mark = _object_mark
 	object.destroy = _object_destroy
+	object.call = _object_call
 	object.fields = make(map[string]Binding)
+}
+
+Not_Callable_Error :: struct{}
+
+_object_call :: proc(ctx: ^Context, object: Value) -> Error {
+	return Not_Callable_Error{}
 }
 
 @(private)

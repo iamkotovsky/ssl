@@ -139,11 +139,17 @@ Parameters and locals use separate namespaces and separate bytecode operations.
 `Load_Param` reads an argument relative to the current frame. Locals are values
 kept on the shared VM stack relative to a local base.
 
-The intended frame window is conceptually:
+The frame window is:
 
 ```text
-caller values | parameters | local_base | active locals | temporaries
+caller values | parameters | callee | active locals | temporaries
+              ^ stack_base           ^ local_base
 ```
+
+`Frame.stack_base` points to the first parameter and `Frame.params` records
+the parameter count. The callee remains immediately after the parameters for
+the lifetime of the frame, keeping it visible to garbage collection without a
+second ownership path. The local base is derived from those two frame fields.
 
 There is no fixed local count in bytecode functions. Local declarations are
 stack operations:
@@ -186,10 +192,10 @@ value remains visible to garbage collection. The initial call contract is:
 ```
 
 `core.call` asks the executor to create a frame and invoke the callee from the
-stack. `core.dispatch` enters an already resolved callable through the current
-frame; this is the path used after an operation such as `add` resolves a
-special method. Native and bytecode implementations use the same frame shape.
-They publish their result on the stack and finish through `core.return_value`.
+stack. A bytecode function then asks the executor to switch that frame to its
+module and function index. Special-method dispatch for ordinary objects is not
+implemented yet. Native and bytecode implementations use the same frame shape.
+They publish their result on the stack and finish through `core.return_`.
 
 Every successful call produces exactly one value. Language-level procedures
 that have no meaningful result will return a singleton nil-like object rather

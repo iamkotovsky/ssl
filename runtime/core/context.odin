@@ -1,8 +1,6 @@
 package core
 
-Raised_Error :: struct {
-	value: Value,
-}
+import "../../bytecode"
 
 Error :: union {
 	Raised_Error,
@@ -11,31 +9,52 @@ Error :: union {
 	Frozen_Class_Error,
 	Sealed_Class_Error,
 	Final_Superclass_Error,
+	Not_Callable_Error,
+	Stack_Underflow_Error,
+	Parameter_Out_Of_Bounds_Error,
+	Arity_Error,
+	Missing_Return_Value_Error,
 }
 
-Stack_Len_Proc :: proc(data: rawptr) -> int
-Push_Proc :: proc(data: rawptr, value: Value)
-Peek_Proc :: proc(data: rawptr, offset: int) -> Value
-Param_Count_Proc :: proc(data: rawptr) -> u32
-Param_Proc :: proc(data: rawptr, index: u32) -> Value
-Call_Stack_Proc :: proc(data: rawptr, arg_count: u32) -> Error
-Dispatch_Proc :: proc(
+Raised_Error :: struct {
+	value: Value,
+}
+
+Stack_Underflow_Error :: struct {}
+
+Parameter_Out_Of_Bounds_Error :: struct {
+	index: u32,
+	count: u32,
+}
+
+Arity_Error :: struct {
+	expected: u32,
+	actual:   u32,
+}
+
+Missing_Return_Value_Error :: struct {}
+
+Exec_Push_Proc :: proc(data: rawptr, value: Value)
+Exec_Peek_Proc :: proc(data: rawptr, offset: int) -> (Value, bool)
+Exec_Param_Proc :: proc(data: rawptr, index: u32) -> (Value, bool)
+Exec_Call_Proc :: proc(data: rawptr, arg_count: u32) -> Error
+Exec_Return_Proc :: proc(data: rawptr) -> Error
+Exec_Raise_Proc :: proc(data: rawptr) -> Error
+Exec_Switch_Proc :: proc(
 	data: rawptr,
-	callee: Value,
-	arg_count: u32,
+	module: rawptr,
+	func: bytecode.Func_Idx,
 ) -> Error
-Return_Proc :: proc(data: rawptr) -> Error
 
 Executor :: struct {
-	data:         rawptr,
-	stack_len:    Stack_Len_Proc,
-	push:         Push_Proc,
-	peek:         Peek_Proc,
-	param_count:  Param_Count_Proc,
-	param:        Param_Proc,
-	call:         Call_Stack_Proc,
-	dispatch:     Dispatch_Proc,
-	return_value: Return_Proc,
+	data:    rawptr,
+	push:    Exec_Push_Proc,
+	peek:    Exec_Peek_Proc,
+	param:   Exec_Param_Proc,
+	call:    Exec_Call_Proc,
+	return_: Exec_Return_Proc,
+	raise:   Exec_Raise_Proc,
+	switch_: Exec_Switch_Proc,
 }
 
 Context :: struct {
@@ -43,31 +62,21 @@ Context :: struct {
 	executor: Executor,
 }
 
-init_context :: proc(
-	ctx: ^Context,
-	runtime: ^Runtime,
-	executor: Executor,
-) {
+init_context :: proc(ctx: ^Context, runtime: ^Runtime, executor: Executor) {
 	assert(ctx != nil)
 	assert(runtime != nil)
 	assert(ctx.runtime == nil, "context is already initialized")
 	assert(executor.data != nil)
-	assert(executor.stack_len != nil)
 	assert(executor.push != nil)
 	assert(executor.peek != nil)
-	assert(executor.param_count != nil)
 	assert(executor.param != nil)
 	assert(executor.call != nil)
-	assert(executor.dispatch != nil)
-	assert(executor.return_value != nil)
+	assert(executor.return_ != nil)
+	assert(executor.raise != nil)
+	assert(executor.switch_ != nil)
 
 	ctx.runtime = runtime
 	ctx.executor = executor
-}
-
-stack_len :: proc(ctx: ^Context) -> int {
-	_assert_context(ctx)
-	return ctx.executor.stack_len(ctx.executor.data)
 }
 
 push :: proc(ctx: ^Context, value: Value) {
@@ -76,20 +85,14 @@ push :: proc(ctx: ^Context, value: Value) {
 	ctx.executor.push(ctx.executor.data, value)
 }
 
-peek :: proc(ctx: ^Context, offset: int = 0) -> Value {
+peek :: proc(ctx: ^Context, offset: int = 0) -> (Value, bool) {
 	_assert_context(ctx)
 	assert(offset >= 0)
 	return ctx.executor.peek(ctx.executor.data, offset)
 }
 
-param_count :: proc(ctx: ^Context) -> u32 {
+param :: proc(ctx: ^Context, index: u32) -> (Value, bool) {
 	_assert_context(ctx)
-	return ctx.executor.param_count(ctx.executor.data)
-}
-
-param :: proc(ctx: ^Context, index: u32) -> Value {
-	_assert_context(ctx)
-	assert(index < param_count(ctx), "parameter index is out of bounds")
 	return ctx.executor.param(ctx.executor.data, index)
 }
 
@@ -100,25 +103,26 @@ call :: proc(ctx: ^Context, arg_count: u32) -> Error {
 	return ctx.executor.call(ctx.executor.data, arg_count)
 }
 
-// Enters an already resolved callable using the current frame and arguments.
-dispatch :: proc(
+return_ :: proc(ctx: ^Context) -> Error {
+	_assert_context(ctx)
+	return ctx.executor.return_(ctx.executor.data)
+}
+
+raise :: proc(ctx: ^Context) -> Error {
+	_assert_context(ctx)
+	return ctx.executor.raise(ctx.executor.data)
+}
+
+// Switches the current frame to a bytecode function. The module owner is
+// opaque here so runtime packages do not depend on the VM package.
+switch_function :: proc(
 	ctx: ^Context,
-	callee: Value,
-	arg_count: u32,
+	module: rawptr,
+	func: bytecode.Func_Idx,
 ) -> Error {
 	_assert_context(ctx)
-	assert(callee != nil)
-	return ctx.executor.dispatch(ctx.executor.data, callee, arg_count)
-}
-
-return_value :: proc(ctx: ^Context) -> Error {
-	_assert_context(ctx)
-	return ctx.executor.return_value(ctx.executor.data)
-}
-
-raise :: proc(value: Value) -> Error {
-	assert(value != nil)
-	return Raised_Error{value}
+	assert(module != nil)
+	return ctx.executor.switch_(ctx.executor.data, module, func)
 }
 
 @(private)
